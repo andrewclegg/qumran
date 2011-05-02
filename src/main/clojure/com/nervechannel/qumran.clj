@@ -32,8 +32,20 @@ via introspection."
     (set-property! inst k v))
   inst)
 
+(defn roll-file [filename]
+  "Renames a file to a new timestamped file in the same location, called
+<basename>-<timestamp>.<ext>, where timestamp is a Unix epoch derived from
+the file's last-modified stamp. Returns the new filename."
+  (let
+    [old-file (File. filename)
+     old-name (.getName old-file)
+     components (vec (split #"\." old-name))
+     timestamp (format "-%d" (/ (.lastModified old-file) 1000))
+     new-basename (apply str (interpose "." (vec (split #"\." (pop components))))) ; TODO append timestamp 
+     dir (.getParent old-file)])) ; TODO rest of this
+
 (defn to-list [sqn]
-  "Converts a sequence to an (untyped) ArrayList."
+  "Copies a sequence into an (untyped) ArrayList."
   (let [lst (ArrayList.)]
     (doseq [v sqn]
       (.add lst v))
@@ -79,10 +91,18 @@ with new entries created from the sequence of entry property maps provided."
   (.get (.getEntries feed) i))
 
 (defn to-file! [filename feed]
-  "Writes the feed out to a file with the given name, overwriting it if it already exsits,
+  "Writes the feed out to a file with the given name, overwriting it if it already exists,
 and returns the number of bytes written."
   (let [sfo (SyndFeedOutput.)
         file (File. filename)]
       (.output sfo feed file)
       (.length file)))
 
+(defn rollover! [filename feed]
+  "Writes the feed out to a file with the given name, preserving any existing file found there as follows.
+The old file is first renamed to <basename>-<timestamp>.<ext>, and then a <link rel=\"prev\">...</link>
+field is added to the new feed, pointing at the old file. Then the new feed is written to the original
+filename. If no file exists at that location already, the new feed is just saved without modifications.
+If the old file cannot be rolled over for some reason, e.g. another timestamped file already exists
+where it needs to go, an exception is thrown. On success, the function returns a vector of the number of bytes
+written to the new feed file, and the new timestamped filename of the original file (or nil if not applicable).")
