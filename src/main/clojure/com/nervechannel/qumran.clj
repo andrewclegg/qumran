@@ -2,7 +2,7 @@
   (:gen-class)
   (:use [clojure.contrib.string :only [upper-case]])
   (:use [clojure.contrib.except :only [throw-if]])
-  (:import (java.io FileWriter))
+  (:import (java.io File))
   (:import (java.util ArrayList))
   (:import (java.beans Introspector))
   (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl SyndContent SyndContentImpl))
@@ -20,9 +20,9 @@
     (throw-if (nil? pd) (str "No such property: " prop))
     (try
       (.invoke (.getWriteMethod pd) inst (into-array [value]))
-      (catch IllegalArgumentException _
+      (catch IllegalArgumentException e
         (throw (IllegalArgumentException.
-                 (str "Property " prop " value <" value "> has the wrong type" )))))))
+                 (str "Property " prop " rejected value <" value "> -- wrong type?") e))))))
 ; TODO we can probably neaten up that rethrow with a macro
 
 (defn set-all! [inst prop-map]
@@ -80,7 +80,9 @@ with new entries created from the sequence of entry property maps provided."
 
 ; TODO comments and tests for following functions
 
-(defn to-file [filename feed]
-  (with-open [writer (FileWriter. filename)]
-    (.output (SyndFeedOutput.) [feed writer])))
+(defn to-file! [filename feed]
+  (let [sfo (SyndFeedOutput.)
+        file (File. filename)]
+      (.output sfo feed file)
+      (.length file)))
 

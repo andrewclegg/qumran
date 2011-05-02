@@ -1,6 +1,7 @@
 (ns com.nervechannel.test-qumran
   (:use clojure.test)
   (:use com.nervechannel.qumran)
+  (:import (java.io File))
   (:import (com.sun.syndication.feed.synd SyndFeedImpl)))
 
 (deftest test-set-all
@@ -37,7 +38,7 @@
    {:title "Commentary" :description "AV only fair way to decide Grand National winner"}])
 
 (def *feed-data*
-  {:title "Qumran News" :description "Plucking diced carrots of information from the data barf"})
+  {:title "Qumran News" :description "Plucking diced carrots of information..." :feedType "atom_1.0"})
 
 (deftest test-build
   (let [feed (build *feed-data* *entries-data*)]
@@ -48,5 +49,12 @@
     (is (= "More news" (.getTitle (get-entry feed 1))))
     (is (= \K (first (.. (get-entry feed 1) getDescription getValue))))
     (is (= "Commentary" (.getTitle (get-entry feed 2))))
-    (is (= \A (first (.. (get-entry feed 2) getDescription getValue))))
-    ))
+    (is (= \A (first (.. (get-entry feed 2) getDescription getValue))))))
+
+(deftest test-to-file
+  (let [filename "com.nervechannel.test-qumran_test-to-file"
+        file (File. filename)
+        feed (build *feed-data* *entries-data*)]
+    (try
+      (is (< 0 (to-file! filename feed)))
+      (finally (is (true? (.delete file)))))))
