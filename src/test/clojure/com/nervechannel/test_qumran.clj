@@ -10,7 +10,7 @@
     (is (= "my title" (.getTitle feed)))
     (is (= "my description" (.getDescription feed)))))
 
-(comment deftest test-to-list
+(deftest test-to-list
   (let [lst (to-list [1 "a" \b])]
     (is (= 1 (.get lst 0)))
     (is (= "a" (.get lst 1)))
@@ -25,7 +25,11 @@
 
 (deftest test-new-entry
   (let [entry (new-entry
-                {:title "my title" :link "http://example.org/"})]
+                {:title "my title" :link "http://example.org/" :description "my description"})]
     (is (not (nil? entry)))
     (is (= "my title" (.getTitle entry)))
-    (is (= "http://example.org/" (.getLink entry)))))
+    (is (= "http://example.org/" (.getLink entry)))
+    (is (= "my description" (.. entry getDescription getValue)))))
+
+(comment deftest test-build
+  (let []))

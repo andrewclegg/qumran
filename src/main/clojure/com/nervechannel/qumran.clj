@@ -5,7 +5,7 @@
   (:import (java.io FileWriter))
   (:import (java.util ArrayList))
   (:import (java.beans Introspector))
-  (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl))
+  (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl SyndContent SyndContentImpl))
   (:import (com.sun.syndication.io SyndFeedOutput)))
 
 (defn property-descriptor [inst prop-name]
@@ -23,42 +23,56 @@
       (catch IllegalArgumentException _
         (throw (IllegalArgumentException.
                  (str "Property " prop " value <" value "> has the wrong type" )))))))
+; TODO we can probably neaten up that rethrow with a macro
 
 (defn set-all! [inst prop-map]
   "Sets a number of properties, identified by keys like :title or :feedType, on a bean instance,
 via introspection."
   (doseq [[k v] prop-map]
     (set-property! inst k v))
-   inst) ; TODO do we need inst here?
+  inst)
 
 (defn to-list [sqn]
   "Converts a sequence to an (untyped) ArrayList."
   (let [lst (ArrayList.)]
     (doseq [v sqn]
-      (.add lst v))))
+      (.add lst v))
+    lst))
 
-(defn new-feed [options]
-  "Creates a new Rome syndication feed with the options provided (a map).
+(defn new-feed [props]
+  "Creates a new Rome syndication feed with the properties provided (a map).
 The map keys correspond to the SyndFeedImpl setters documented here:
 http://repo1.maven.org/maven2/net/java/dev/rome/rome/1.0.0/rome-1.0.0-javadoc.jar
-(but as camel-cased property names rather than setters, e.g. title not setTitle)."
+(but as camel-cased property names rather than setters, e.g. :title not setTitle)."
   (let [feed (SyndFeedImpl.)]
-    (set-all! feed options)))
+    (set-all! feed props)))
 
-(defn new-entry [options]
-  "Creates a new Rome syndication entry with the options provided (a map).
+(defn pre-new-entry [props]
+  "Pre-processes the property map for a new entry, turning :description into
+a SyndContent if found."
+  (if (and (contains? props :description) (not (instance? SyndContent (props :description))))
+    (let [cont (doto (SyndContentImpl.) (.setValue (str (props :description))))]
+      (assoc props :description cont))
+    props))
+
+(defn new-entry [props]
+  "Creates a new Rome syndication entry with the properties provided (a map).
 The map keys correspond to the SyndEntryImpl setters documented here:
 http://repo1.maven.org/maven2/net/java/dev/rome/rome/1.0.0/rome-1.0.0-javadoc.jar
-(but as camel-cased property names rather than setters, e.g. title not setTitle)."
-  (let [entry (SyndEntryImpl.)]
-    (set-all! entry options)))
+(but as camel-cased property names rather than setters, e.g. :title not setTitle).
+If a :description property is supplied as a string, it will be automatically
+converted into a SyndContent instance."
+  (let [entry (SyndEntryImpl.)
+        props2 (pre-new-entry props)]
+    (set-all! entry props2)))
 
-(defn make-populated [options entries]
-  "Creates a new Rome syndication feed with the options provided, and populates
-it from a sequence of entries."
-  (let [feed (new-feed options)
-        entry-list (to-list entries)]
-    (.setEntries feed entry-list)))
+(defn build [props maps]
+  "Creates a new Rome syndication feed with the properties provided, and populates
+with new entries created from the sequence of entry property maps provided."
+  (let [feed (new-feed props)
+        entry-list (to-list (map new-entry maps))]
+    (.setEntries feed entry-list)
+    feed))
 
 ; TODO comments and tests for following functions
 
