@@ -25,7 +25,7 @@
 
 (deftest test-new-entry
   (let [entry (new-entry
-                {:title "my title" :description "my description"})]
+                {:title "my title" :link "http://example.org/"})]
     (is (not (nil? entry)))
     (is (= "my title" (.getTitle entry)))
-    (is (= "my description" (.getDescription entry)))))
+    (is (= "http://example.org/" (.getLink entry)))))

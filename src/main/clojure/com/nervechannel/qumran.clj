@@ -1,69 +1,68 @@
 (ns com.nervechannel.qumran
   (:gen-class)
   (:use [clojure.contrib.string :only [upper-case]])
+  (:use [clojure.contrib.except :only [throw-if]])
   (:import (java.io FileWriter))
   (:import (java.util ArrayList))
+  (:import (java.beans Introspector))
   (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl))
   (:import (com.sun.syndication.io SyndFeedOutput)))
 
-(defn make-setter
-  "Takes a keyword identifying a property, e.g. :title or :fullName, and returns the corresponding setter
-method name, e.g. \"setTitle\" or \"setFullName\"."
-  [propkey]
-  (let [propname (name propkey)]
-    (str "set"
-	       (.toUpperCase (subs propname 0 1))
-	       (subs propname 1))))
+(defn property-descriptor [inst prop-name]
+  "Gets the proeprty descriptor for the specifed property of a bean instance."
+  (first
+    (filter #(= (name prop-name) (.getName %))
+            (.getPropertyDescriptors (Introspector/getBeanInfo (class inst))))))
 
-(defn set-all!
-  "Sets a number of properties, identified by keys like :title or :feedType, on an object.
-Works by converting the property names into setters like \"setTitle\" or \"setFeedType\"."
-  [obj prop-map]
+(defn set-property! [inst prop value]
+  "Sets the specifed property of the bean instance via introspection."
+  (let [pd (property-descriptor inst prop)]
+    (throw-if (nil? pd) (str "No such property: " prop))
+    (try
+      (.invoke (.getWriteMethod pd) inst (into-array [value]))
+      (catch IllegalArgumentException _
+        (throw (IllegalArgumentException.
+                 (str "Property " prop " value <" value "> has the wrong type" )))))))
+
+(defn set-all! [inst prop-map]
+  "Sets a number of properties, identified by keys like :title or :feedType, on a bean instance,
+via introspection."
   (doseq [[k v] prop-map]
-    (let [method-name (make-setter k)]
-      (clojure.lang.Reflector/invokeInstanceMethod
-        obj
-        method-name
-        (into-array Object [v]))))
-   obj) ; TODO do we need obj here?
+    (set-property! inst k v))
+   inst) ; TODO do we need inst here?
 
-(defn to-list
+(defn to-list [sqn]
   "Converts a sequence to an (untyped) ArrayList."
-  [sqn]
   (let [lst (ArrayList.)]
     (doseq [v sqn]
       (.add lst v))))
 
-(defn new-feed
+(defn new-feed [options]
   "Creates a new Rome syndication feed with the options provided (a map).
 The map keys correspond to the SyndFeedImpl setters documented here:
 http://repo1.maven.org/maven2/net/java/dev/rome/rome/1.0.0/rome-1.0.0-javadoc.jar
 (but as camel-cased property names rather than setters, e.g. title not setTitle)."
-  [options]
   (let [feed (SyndFeedImpl.)]
     (set-all! feed options)))
 
-(defn new-entry
+(defn new-entry [options]
   "Creates a new Rome syndication entry with the options provided (a map).
 The map keys correspond to the SyndEntryImpl setters documented here:
 http://repo1.maven.org/maven2/net/java/dev/rome/rome/1.0.0/rome-1.0.0-javadoc.jar
 (but as camel-cased property names rather than setters, e.g. title not setTitle)."
-  [options]
   (let [entry (SyndEntryImpl.)]
     (set-all! entry options)))
 
-(defn make-populated
+(defn make-populated [options entries]
   "Creates a new Rome syndication feed with the options provided, and populates
 it from a sequence of entries."
-  [options entries]
   (let [feed (new-feed options)
         entry-list (to-list entries)]
     (.setEntries feed entry-list)))
 
 ; TODO comments and tests for following functions
 
-(defn to-file
-  [filename feed]
+(defn to-file [filename feed]
   (with-open [writer (FileWriter. filename)]
     (.output (SyndFeedOutput.) [feed writer])))
 
