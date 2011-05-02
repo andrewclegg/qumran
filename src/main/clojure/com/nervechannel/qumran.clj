@@ -78,9 +78,9 @@ with new entries created from the sequence of entry property maps provided."
   "Gets the entry at the given index position from a feed."
   (.get (.getEntries feed) i))
 
-; TODO comments and tests for following functions
-
 (defn to-file! [filename feed]
+  "Writes the feed out to a file with the given name, overwriting it if it already exsits,
+and returns the number of bytes written."
   (let [sfo (SyndFeedOutput.)
         file (File. filename)]
       (.output sfo feed file)
