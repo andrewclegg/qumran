@@ -74,6 +74,10 @@ with new entries created from the sequence of entry property maps provided."
     (.setEntries feed entry-list)
     feed))
 
+(defn get-entry [feed i]
+  "Gets the entry at the given index position from a feed."
+  (.get (.getEntries feed) i))
+
 ; TODO comments and tests for following functions
 
 (defn to-file [filename feed]

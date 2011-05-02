@@ -31,5 +31,22 @@
     (is (= "http://example.org/" (.getLink entry)))
     (is (= "my description" (.. entry getDescription getValue)))))
 
-(comment deftest test-build
-  (let []))
+(def *entries-data*
+  [{:title "Some news" :description "Bin Laden wedding exclusive"}
+   {:title "More news" :description "Kate Middleton killed by US special forces"}
+   {:title "Commentary" :description "AV only fair way to decide Grand National winner"}])
+
+(def *feed-data*
+  {:title "Qumran News" :description "Plucking diced carrots of information from the data barf"})
+
+(deftest test-build
+  (let [feed (build *feed-data* *entries-data*)]
+    (is (= "Qumran News" (.getTitle feed)))
+    (is (= \P (first (.getDescription feed))))
+    (is (= "Some news" (.getTitle (get-entry feed 0))))
+    (is (= \B (first (.. (get-entry feed 0) getDescription getValue))))
+    (is (= "More news" (.getTitle (get-entry feed 1))))
+    (is (= \K (first (.. (get-entry feed 1) getDescription getValue))))
+    (is (= "Commentary" (.getTitle (get-entry feed 2))))
+    (is (= \A (first (.. (get-entry feed 2) getDescription getValue))))
+    ))
