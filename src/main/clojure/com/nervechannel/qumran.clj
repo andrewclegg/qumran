@@ -1,8 +1,8 @@
 (ns com.nervechannel.qumran
   (:gen-class)
-  (:use [clojure.contrib.string :only [upper-case]])
+  (:use [clojure.contrib.string :only [upper-case split]])
   (:use [clojure.contrib.except :only [throw-if]])
-  (:import (java.io File))
+  (:import (java.io File IOException))
   (:import (java.util ArrayList))
   (:import (java.beans Introspector))
   (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl SyndContent SyndContentImpl))
@@ -32,17 +32,26 @@ via introspection."
     (set-property! inst k v))
   inst)
 
-(defn roll-file [filename]
+(defn roll-file [filepath]
   "Renames a file to a new timestamped file in the same location, called
 <basename>-<timestamp>.<ext>, where timestamp is a Unix epoch derived from
-the file's last-modified stamp. Returns the new filename."
+the file's last-modified stamp. Returns the new filepath. Throws if the
+rename fails."
   (let
-    [old-file (File. filename)
+    [old-file (File. filepath)
      old-name (.getName old-file)
      components (vec (split #"\." old-name))
      timestamp (format "-%d" (/ (.lastModified old-file) 1000))
-     new-basename (apply str (interpose "." (vec (split #"\." (pop components))))) ; TODO append timestamp 
-     dir (.getParent old-file)])) ; TODO rest of this
+     new-basename (if (> (count components) 1)
+                    (apply str (concat
+                                 (interpose "." (pop components))
+                                 (list timestamp "." (peek components))))
+                    (apply str (old-name timestamp)))
+     dir (.getParent old-file)
+     new-file (File. dir new-basename)]
+    (if (.renameTo old-file new-file)
+      (.getCanonicalPath new-file)
+      (throw (IOException. (format "Failed to rename %s to %s" filepath (.getCanonicalPath new-file)))))))
 
 (defn to-list [sqn]
   "Copies a sequence into an (untyped) ArrayList."
@@ -103,6 +112,8 @@ and returns the number of bytes written."
 The old file is first renamed to <basename>-<timestamp>.<ext>, and then a <link rel=\"prev\">...</link>
 field is added to the new feed, pointing at the old file. Then the new feed is written to the original
 filename. If no file exists at that location already, the new feed is just saved without modifications.
-If the old file cannot be rolled over for some reason, e.g. another timestamped file already exists
-where it needs to go, an exception is thrown. On success, the function returns a vector of the number of bytes
-written to the new feed file, and the new timestamped filename of the original file (or nil if not applicable).")
+If the old file cannot be rolled over for some reason, an exception is thrown. If another file already
+exists with the same timestamped name as is required for the rollover (unlikely), IT WILL BE OVERWRITTEN. 
+On success, the function returns a vector of the number of bytes written to the new feed file, and the
+new timestamped filename of the old file (or nil if not applicable)."
+  (comment TODO))

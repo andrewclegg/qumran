@@ -58,3 +58,15 @@
     (try
       (is (< 0 (to-file! filename feed)))
       (finally (is (true? (.delete file)))))))
+
+(deftest test-roll-file
+  (let [tempfile (File/createTempFile "com.nervechannel.test-qumran_test-roll-file" ".tmp")
+        filepath (.getCanonicalPath tempfile)
+        newpath (roll-file filepath)
+        newfile (File. newpath)]
+    (try
+      (and
+        (is (.exists newfile))
+        (is (not (.exists tempfile)))
+        (is (re-find #"com\.nervechannel\.test-qumran_test-roll-file\d+-\d+\.tmp" (.getName newfile))))
+      (finally (is (true? (or (.delete tempfile) (.delete newfile))))))))
