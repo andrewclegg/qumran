@@ -52,12 +52,12 @@
     (is (= \A (first (.. (get-entry feed 2) getDescription getValue))))))
 
 (deftest test-to-file
-  (let [filename "com.nervechannel.test-qumran_test-to-file"
-        file (File. filename)
+  (let [tempfile (File/createTempFile "com.nervechannel.test-qumran_test-to-file" ".tmp")
+        filepath (.getCanonicalPath tempfile)
         feed (build *feed-data* *entries-data*)]
     (try
-      (is (< 0 (to-file! filename feed)))
-      (finally (is (true? (.delete file)))))))
+      (is (< 0 (to-file! filepath feed)))
+      (finally (is (true? (.delete tempfile)))))))
 
 (deftest test-roll-file
   (let [tempfile (File/createTempFile "com.nervechannel.test-qumran_test-roll-file" ".tmp")
@@ -69,4 +69,28 @@
         (is (.exists newfile))
         (is (not (.exists tempfile)))
         (is (re-find #"com\.nervechannel\.test-qumran_test-roll-file\d+-\d+\.tmp" (.getName newfile))))
-      (finally (is (true? (or (.delete tempfile) (.delete newfile))))))))
+      (finally (is (true? (or
+                            (.delete tempfile)
+                            (.delete newfile))))))))
+
+(defn has-prev-link [feed link]
+  (some #(and (= "prev" (.getRel %)) (= link (.getHref %))) (.getLinks feed)))
+
+(deftest test-rollover
+  (let [feed (build *feed-data* *entries-data*)
+        outfile (File/createTempFile "com.nervechannel.test-qumran_test-rollover" ".tmp")
+        outpath (.getCanonicalPath outfile)
+        [outsize rolledpath] (rollover! outpath feed)
+        rolledfile (File. rolledpath)
+        rolledname (.getName rolledfile)]
+    (try
+      (and
+        (is (< 0 outsize))
+        (is (.exists outfile))
+        (is (.exists rolledfile))
+        (is (has-prev-link feed rolledname)))
+      (finally (is (true? (and
+                            (.delete outfile)
+                            (.delete rolledfile))))))))
+
+

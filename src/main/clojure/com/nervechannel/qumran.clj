@@ -5,7 +5,7 @@
   (:import (java.io File IOException))
   (:import (java.util ArrayList))
   (:import (java.beans Introspector))
-  (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl SyndContent SyndContentImpl))
+  (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl SyndContent SyndContentImpl SyndLinkImpl))
   (:import (com.sun.syndication.io SyndFeedOutput)))
 
 (defn property-descriptor [inst prop-name]
@@ -99,21 +99,36 @@ with new entries created from the sequence of entry property maps provided."
   "Gets the entry at the given index position from a feed."
   (.get (.getEntries feed) i))
 
-(defn to-file! [filename feed]
-  "Writes the feed out to a file with the given name, overwriting it if it already exists,
+(defn to-file! [filepath feed]
+  "Writes the feed out to a file at the given location, overwriting it if it already exists,
 and returns the number of bytes written."
   (let [sfo (SyndFeedOutput.)
-        file (File. filename)]
-      (.output sfo feed file)
-      (.length file)))
+        file (File. filepath)]
+      (do
+        (.output sfo feed file)
+        (.length file))))
 
-(defn rollover! [filename feed]
-  "Writes the feed out to a file with the given name, preserving any existing file found there as follows.
+(defn roll-and-save! [filepath feed]
+  "Helper function for rollover!, dealing with the case when filepath is already occupied."
+  (let [rolledpath (roll-file filepath)
+        rolledname (.getName (File. rolledpath))
+        prevlink (doto (SyndLinkImpl.) (.setHref rolledname) (.setRel "prev"))]
+    (do
+      (.. feed (getLinks) (add prevlink))
+      (vector (to-file! filepath feed) rolledpath))))
+
+(defn rollover! [filepath feed]
+  "Writes the feed out to a file at the given location, preserving any existing file found there as follows.
 The old file is first renamed to <basename>-<timestamp>.<ext>, and then a <link rel=\"prev\">...</link>
 field is added to the new feed, pointing at the old file. Then the new feed is written to the original
 filename. If no file exists at that location already, the new feed is just saved without modifications.
 If the old file cannot be rolled over for some reason, an exception is thrown. If another file already
 exists with the same timestamped name as is required for the rollover (unlikely), IT WILL BE OVERWRITTEN. 
 On success, the function returns a vector of the number of bytes written to the new feed file, and the
-new timestamped filename of the old file (or nil if not applicable)."
-  (comment TODO))
+new filepath of the renamed file (or nil if not applicable)."
+  (if (.exists (File. filepath))
+      ; filepath is occupied -- roll over and save
+      (roll-and-save! filepath feed)
+      ; filepath is clear -- save directly
+      (vector (to-file! filepath feed) nil)))
+
