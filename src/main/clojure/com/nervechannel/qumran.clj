@@ -1,7 +1,7 @@
 (ns com.nervechannel.qumran
   (:gen-class)
-  (:use [clojure.contrib.string :only [upper-case split]])
-  (:use [clojure.contrib.except :only [throw-if]])
+  (:use [clojure.contrib.string :only (upper-case split)])
+  (:use [clojure.contrib.except :only (throw-if)])
   (:import (java.io File IOException))
   (:import (java.util ArrayList))
   (:import (java.beans Introspector))
