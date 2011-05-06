@@ -11,4 +11,6 @@ Test it like so (requires Maven):
 
 The tests, in src/test/clojure/com/nervechannel/, are the best guide to usage at the moment.
 
- 
+To package it and install it in your local Maven repo, do this:
+
+    mvn install
