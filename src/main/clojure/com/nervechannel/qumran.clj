@@ -111,8 +111,6 @@ unless proc-instrs is nil/empty in which case it returns the original unmodified
     jdom
     (let [output (.setDocType (Document.) (.getDocType jdom))]
       (doseq [[instr-name attribs] proc-instrs]
-        (println instr-name)
-        (println attribs)
         (let [pi (ProcessingInstruction. instr-name attribs)]
           (.addContent output pi)))
       (.addContent output (.cloneContent jdom))
