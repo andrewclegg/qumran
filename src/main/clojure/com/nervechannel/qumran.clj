@@ -104,13 +104,15 @@ with new entries created from the sequence of entry property maps provided."
 
 (defn add-proc-instrs [proc-instrs jdom]
   "Augments a JDom document containing a feed with 0 or more XML processing instructions,
-provided as a vector of [string map] vectors, where the string is the instruction name and
+provided as a collection of [string map] vectors, where the string is the instruction name and
 the map is its attributes. Returns a copy of the document, rather than changing the original,
 unless proc-instrs is nil/empty in which case it returns the original unmodified."
   (if (or (nil? proc-instrs) (empty? proc-instrs))
     jdom
     (let [output (.setDocType (Document.) (.getDocType jdom))]
       (doseq [[instr-name attribs] proc-instrs]
+        (println instr-name)
+        (println attribs)
         (let [pi (ProcessingInstruction. instr-name attribs)]
           (.addContent output pi)))
       (.addContent output (.cloneContent jdom))
@@ -118,7 +120,7 @@ unless proc-instrs is nil/empty in which case it returns the original unmodified
 
 (defn to-file! [filepath feed & [proc-instrs]]
   "Writes the feed out to a file at the given location, overwriting it if it already exists,
-and returns the number of bytes written. proc-instrs is an optional vector of processing instructions to
+and returns the number of bytes written. proc-instrs can contain one or more processing instructions to
 be added to the XML file -- see add-proc-instrs for its format."
     (let [wfo (WireFeedOutput.)
           jdom (add-proc-instrs
@@ -146,7 +148,7 @@ filename. If no file exists at that location already, the new feed is just saved
 If the old file cannot be rolled over for some reason, an exception is thrown. If another file already
 exists with the same timestamped name as is required for the rollover (unlikely), IT WILL BE OVERWRITTEN.
 On success, the function returns a vector of the number of bytes written to the new feed file, and the
-new filepath of the renamed file (or nil if not applicable). You can optionally supply a vector of
+new filepath of the renamed file (or nil if not applicable). You can optionally supply a collection of XML
 processing instructions -- see add-proc-instrs for format."
   (if (.exists (File. filepath))
       ; filepath is occupied -- roll over and save
