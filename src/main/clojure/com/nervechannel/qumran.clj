@@ -2,11 +2,13 @@
   (:gen-class)
   (:use [clojure.contrib.string :only (upper-case split)])
   (:use [clojure.contrib.except :only (throw-if)])
-  (:import (java.io File IOException))
+  (:import (java.io File IOException BufferedWriter FileWriter))
   (:import (java.util ArrayList))
   (:import (java.beans Introspector))
   (:import (com.sun.syndication.feed.synd SyndFeedImpl SyndEntryImpl SyndContent SyndContentImpl SyndLinkImpl))
-  (:import (com.sun.syndication.io SyndFeedOutput)))
+  (:import (com.sun.syndication.io WireFeedOutput))
+  (:import (org.jdom Document ProcessingInstruction))
+  (:import (org.jdom.output XMLOutputter Format)))
 
 (defn property-descriptor [inst prop-name]
   "Gets the proeprty descriptor for the specifed property of a bean instance."
@@ -72,7 +74,8 @@ http://repo1.maven.org/maven2/net/java/dev/rome/rome/1.0.0/rome-1.0.0-javadoc.ja
   "Pre-processes the property map for a new entry, turning :description into
 a SyndContent if found."
   (if (and (contains? props :description) (not (instance? SyndContent (props :description))))
-    (let [cont (doto (SyndContentImpl.) (.setValue (str (props :description))))]
+    (let [cont (doto (SyndContentImpl.)
+                 (.setValue (str (props :description))))]
       (assoc props :description cont))
     props))
 
@@ -99,23 +102,44 @@ with new entries created from the sequence of entry property maps provided."
   "Gets the entry at the given index position from a feed."
   (.get (.getEntries feed) i))
 
-(defn to-file! [filepath feed]
+(defn add-proc-instrs [proc-instrs jdom]
+  "Augments a JDom document containing a feed with 0 or more XML processing instructions,
+provided as a vector of [string map] vectors, where the string is the instruction name and
+the map is its attributes. Returns a copy of the document, rather than changing the original,
+unless proc-instrs is empty in which case it returns the original unmodified."
+  (if (empty? proc-instrs)
+    jdom
+    (let [output (.setDocType (Document.) (.getDocType jdom))]
+      (doseq [[instr-name attribs] proc-instrs]
+        (let [pi (ProcessingInstruction. instr-name attribs)]
+          (.addContent output pi)))
+      (.addContent output (.cloneContent jdom))
+      output)))
+
+(defn to-file! 
   "Writes the feed out to a file at the given location, overwriting it if it already exists,
-and returns the number of bytes written."
-  (let [sfo (SyndFeedOutput.)
-        file (File. filepath)]
-      (do
-        (.output sfo feed file)
-        (.length file))))
+and returns the number of bytes written. proc-instrs is an optional vector of processing instructions to
+be added to the XML file -- see add-proc-instrs for its format."
+  ([filepath feed proc-instrs]
+    (let [wfo (WireFeedOutput.)
+          jdom (add-proc-instrs
+                 proc-instrs
+                 (.outputJDom wfo (.createWireFeed feed)))
+          outputter (XMLOutputter. (Format/getCompactFormat))
+          file (File. filepath)
+          writer (BufferedWriter. (FileWriter. file))]
+      (.output outputter jdom writer)
+      (.length file)))
+  ([filepath feed]
+    (to-file! filepath feed {})))
 
 (defn roll-and-save! [filepath feed]
   "Helper function for rollover!, dealing with the case when filepath is already occupied."
   (let [rolledpath (roll-file filepath)
         rolledname (.getName (File. rolledpath))
         prevlink (doto (SyndLinkImpl.) (.setHref rolledname) (.setRel "prev"))]
-    (do
-      (.. feed (getLinks) (add prevlink))
-      (vector (to-file! filepath feed) rolledpath))))
+    (.. feed (getLinks) (add prevlink))
+      (vector (to-file! filepath feed) rolledpath)))
 
 (defn rollover! [filepath feed]
   "Writes the feed out to a file at the given location, preserving any existing file found there as follows.
@@ -123,7 +147,7 @@ The old file is first renamed to <basename>-<timestamp>.<ext>, and then a <link 
 field is added to the new feed, pointing at the old file. Then the new feed is written to the original
 filename. If no file exists at that location already, the new feed is just saved without modifications.
 If the old file cannot be rolled over for some reason, an exception is thrown. If another file already
-exists with the same timestamped name as is required for the rollover (unlikely), IT WILL BE OVERWRITTEN. 
+exists with the same timestamped name as is required for the rollover (unlikely), IT WILL BE OVERWRITTEN.
 On success, the function returns a vector of the number of bytes written to the new feed file, and the
 new filepath of the renamed file (or nil if not applicable)."
   (if (.exists (File. filepath))

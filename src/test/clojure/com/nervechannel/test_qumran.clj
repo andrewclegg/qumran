@@ -2,7 +2,36 @@
   (:use clojure.test)
   (:use com.nervechannel.qumran)
   (:import (java.io File))
+  (:import (org.jdom Document Element))
+  (:import (org.jdom.input SAXBuilder))
   (:import (com.sun.syndication.feed.synd SyndFeedImpl)))
+
+(def *jdom*
+  (let [root-elem (.setText (Element. "greeting") "hello world")]
+    (Document. root-elem)))
+
+(def *proc-instrs*
+  [["xml-stylesheet"
+    {"href" "http://feeds.feedburner.com/~d/styles/rss2full.xsl"
+     "type" "text/xsl"}]
+   ["xml-stylesheet"
+    {"href" "http://feeds.feedburner.com/~d/styles/itemcontent.css"
+     "type" "text/css"}]])
+
+;; TODO this test feels a bit fragile as it relies on JDom's debugging output
+(deftest test-add-proc-instrs
+  (let [jdom (add-proc-instrs *proc-instrs* *jdom*)
+        cont0 (.getContent jdom 0)
+        cont1 (.getContent jdom 1)
+        cont2 (.getContent jdom 2)]
+    (is (= "[ProcessingInstruction: <?xml-stylesheet href=\"http://feeds.feedburner.com/~d/styles/rss2full.xsl\" type=\"text/xsl\"?>]"
+           (.toString cont0)))
+    (is (= "[ProcessingInstruction: <?xml-stylesheet href=\"http://feeds.feedburner.com/~d/styles/itemcontent.css\" type=\"text/css\"?>]"
+           (.toString cont1)))
+    (is (= "[Element: <greeting/>]"
+           (.toString cont2)))
+    (is (= "hello world"
+           (.getText cont2)))))
 
 (deftest test-set-all
   (let [feed (set-all! (SyndFeedImpl.)
