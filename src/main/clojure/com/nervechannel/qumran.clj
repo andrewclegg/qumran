@@ -106,8 +106,8 @@ with new entries created from the sequence of entry property maps provided."
   "Augments a JDom document containing a feed with 0 or more XML processing instructions,
 provided as a vector of [string map] vectors, where the string is the instruction name and
 the map is its attributes. Returns a copy of the document, rather than changing the original,
-unless proc-instrs is empty in which case it returns the original unmodified."
-  (if (empty? proc-instrs)
+unless proc-instrs is nil/empty in which case it returns the original unmodified."
+  (if (or (nil? proc-instrs) (empty? proc-instrs))
     jdom
     (let [output (.setDocType (Document.) (.getDocType jdom))]
       (doseq [[instr-name attribs] proc-instrs]
@@ -116,11 +116,10 @@ unless proc-instrs is empty in which case it returns the original unmodified."
       (.addContent output (.cloneContent jdom))
       output)))
 
-(defn to-file! 
+(defn to-file! [filepath feed & [proc-instrs]]
   "Writes the feed out to a file at the given location, overwriting it if it already exists,
 and returns the number of bytes written. proc-instrs is an optional vector of processing instructions to
 be added to the XML file -- see add-proc-instrs for its format."
-  ([filepath feed proc-instrs]
     (let [wfo (WireFeedOutput.)
           jdom (add-proc-instrs
                  proc-instrs
@@ -130,18 +129,16 @@ be added to the XML file -- see add-proc-instrs for its format."
           writer (BufferedWriter. (FileWriter. file))]
       (.output outputter jdom writer)
       (.length file)))
-  ([filepath feed]
-    (to-file! filepath feed {})))
 
-(defn roll-and-save! [filepath feed]
+(defn roll-and-save! [filepath feed & [proc-instrs]]
   "Helper function for rollover!, dealing with the case when filepath is already occupied."
   (let [rolledpath (roll-file filepath)
-        rolledname (.getName (File. rolledpath))
-        prevlink (doto (SyndLinkImpl.) (.setHref rolledname) (.setRel "prev"))]
-    (.. feed (getLinks) (add prevlink))
+          rolledname (.getName (File. rolledpath))
+          prevlink (doto (SyndLinkImpl.) (.setHref rolledname) (.setRel "prev"))]
+      (.. feed (getLinks) (add prevlink))
       (vector (to-file! filepath feed) rolledpath)))
 
-(defn rollover! [filepath feed]
+(defn rollover! [filepath feed & [proc-instrs]]
   "Writes the feed out to a file at the given location, preserving any existing file found there as follows.
 The old file is first renamed to <basename>-<timestamp>.<ext>, and then a <link rel=\"prev\">...</link>
 field is added to the new feed, pointing at the old file. Then the new feed is written to the original
@@ -149,10 +146,11 @@ filename. If no file exists at that location already, the new feed is just saved
 If the old file cannot be rolled over for some reason, an exception is thrown. If another file already
 exists with the same timestamped name as is required for the rollover (unlikely), IT WILL BE OVERWRITTEN.
 On success, the function returns a vector of the number of bytes written to the new feed file, and the
-new filepath of the renamed file (or nil if not applicable)."
+new filepath of the renamed file (or nil if not applicable). You can optionally supply a vector of
+processing instructions -- see add-proc-instrs for format."
   (if (.exists (File. filepath))
       ; filepath is occupied -- roll over and save
-      (roll-and-save! filepath feed)
+      (roll-and-save! filepath feed proc-instrs)
       ; filepath is clear -- save directly
-      (vector (to-file! filepath feed) nil)))
+      (vector (to-file! filepath feed proc-instrs) nil)))
 
